@@ -4,35 +4,65 @@ function _toConsumableArray(arr) { if (Array.isArray(arr)) { for (var i = 0, arr
 
 window.iClid = function (options) {
   try {
+    var modeTypes = {
+      ADD: 'add',
+      REPLACE: 'replace'
+    };
     var selector = options.selector || 'article';
     var keys = options.keys || [];
+    var ignoreKeys = options.ignoreKeys || [];
     var enabledPathList = options.enabledPathList || [];
+    var mode = options.mode || modeTypes.ADD;
 
     var linkDecoration = function linkDecoration(locationHref, linkUrlStr, paramNames) {
+      var ignoreParamNames = arguments.length > 3 && arguments[3] !== undefined ? arguments[3] : [];
+      var mode = arguments.length > 4 && arguments[4] !== undefined ? arguments[4] : modeTypes.ADD;
+
       var locationUrl = new URL(locationHref);
-      var paramRegexps = paramNames.map(function (paramName) {
-        return new RegExp('(\\?|&)(?<param>' + paramName + '=.*?)(&|#|$)');
-      });
+      var linkUrlObj = new URL(linkUrlStr, locationHref);
 
-      var matchParams = paramRegexps.map(function (regexp) {
-        return locationUrl.search.match(regexp);
-      }).filter(function (match) {
-        return match && match.groups && match.groups.param;
-      }).map(function (match) {
-        return match.groups.param;
-      });
+      var ignoreFromLocationSearch = function ignoreFromLocationSearch(searchParamsStr, ignoreParamNames) {
+        ignoreParamNames.map(function (ignoreParamName) {
+          searchParamsStr = searchParamsStr.replace(new RegExp('(\\?|&)(' + ignoreParamName + '=.*?)(?=&|#|$)', 'g'), '');
+        });
+        return searchParamsStr;
+      };
 
-      if (matchParams.length > 0) {
-        var linkUrlObj = new URL(linkUrlStr, locationHref);
-        var matchParamStr = matchParams.join('&');
-        var modParamStr = '';
-        if (linkUrlObj.search) {
-          modParamStr = linkUrlObj.search + '&' + matchParamStr;
-        } else {
-          modParamStr = '?' + matchParamStr;
+      var newSearchStr = locationUrl.search;
+
+      try {
+        newSearchStr = ignoreFromLocationSearch(newSearchStr, ignoreParamNames);
+
+        var paramRegexps = paramNames.map(function (paramName) {
+          return new RegExp('(\\?|&)(?<param>' + paramName + '=.*?)(&|#|$)');
+        });
+
+        var matchParams = paramRegexps.map(function (regexp) {
+          return newSearchStr.match(regexp);
+        }).filter(function (match) {
+          return match && match.groups && match.groups.param;
+        }).map(function (match) {
+          return match.groups.param;
+        });
+
+        if (matchParams.length > 0) {
+          newSearchStr = '?' + matchParams.join('&');
         }
-        return linkUrlObj.origin + linkUrlObj.pathname + modParamStr + linkUrlObj.hash;
-      } else {
+
+        if (newSearchStr === '') {
+          return linkUrlStr;
+        }
+
+        if (mode === modeTypes.REPLACE) {
+          return linkUrlObj.origin + linkUrlObj.pathname + newSearchStr + linkUrlObj.hash;
+        } else if (mode === modeTypes.ADD) {
+          var separator = linkUrlObj.search === '' ? '?' : '&';
+          var modSearchStr = linkUrlObj.search + separator + newSearchStr.replace(/^\?/, '');
+          return linkUrlObj.origin + linkUrlObj.pathname + modSearchStr + linkUrlObj.hash;
+        } else {
+          return linkUrlStr;
+        }
+      } catch (e) {
         return linkUrlStr;
       }
     };
@@ -56,7 +86,7 @@ window.iClid = function (options) {
 
     var anchors = [].concat(_toConsumableArray(document.querySelector(selector).getElementsByTagName('a')));
     anchors.forEach(function (a) {
-      a.href = linkDecoration(location.href, a.href, keys);
+      a.href = linkDecoration(location.href, a.href, keys, ignoreKeys, mode);
     });
   } catch (e) {
     console.log(e);
