@@ -1,0 +1,17 @@
+{
+  "compilerOptions": {
+    "sourceMap": true,
+    "target": "ES5",
+    "module": "ES2015",
+    "baseUrl": "./src/",
+    "paths": {
+      "#/*": ["*"]
+    },
+    "downlevelIteration": true,
+    "lib": [
+      "dom",
+      "dom.iterable",
+      "esnext",
+    ],
+  }
+}
